@@ -1,0 +1,17 @@
+\name{writeResultsToFile}
+\alias{writeResultsToFile}
+\title{writeResultsToFile}
+\usage{
+writeResultsToFile(rapidr.test, output.fname)
+}
+\arguments{
+  \item{rapidr.test}{rapidr.test object which contains the
+  results from testing a sample}
+
+  \item{output.fname}{file name of the output file (it will
+  be tab delimited)}
+}
+\description{
+This function writes the rapidr.test object to a file
+}
+

@@ -1,0 +1,16 @@
+\name{print.rapidr.ref}
+\alias{print.rapidr.ref}
+\title{print.rapidr.ref}
+\usage{
+\method{print}{rapidr.ref}(x, ...)
+}
+\arguments{
+  \item{x}{rapidr.ref object which contains the baselines
+  and the type of correction used to create the baselines}
+
+  \item{...}{other options}
+}
+\description{
+Pretty print the rapidr.ref object
+}
+

@@ -1,0 +1,17 @@
+\name{makeGCContentData}
+\alias{makeGCContentData}
+\title{makeGCContentData}
+\usage{
+makeGCContentData(gc.fname, k = 20000)
+}
+\arguments{
+  \item{gc.fname}{file name of the output file. The file
+  will be written as a .RData object}
+
+  \item{k}{bin size, default is 20,000 bp}
+}
+\description{
+This function calculates the GC content using the hg19
+reference genome in bins of user-defined size
+}
+

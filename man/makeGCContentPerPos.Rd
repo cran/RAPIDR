@@ -1,0 +1,17 @@
+\name{makeGCContentPerPos}
+\alias{makeGCContentPerPos}
+\title{makeGCContentPerPos}
+\usage{
+makeGCContentPerPos(gc.fname, k = 200)
+}
+\arguments{
+  \item{gc.fname}{file name of the output file. The file
+  will be written as a .RData object}
+
+  \item{k}{bin size, default is 200 bp}
+}
+\description{
+This function calculates the GC content using the hg19
+reference genome for each position in the chromosome
+}
+

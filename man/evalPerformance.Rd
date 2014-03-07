@@ -1,0 +1,24 @@
+\name{evalPerformance}
+\alias{evalPerformance}
+\title{evalPerformance}
+\usage{
+evalPerformance(refset.calls, sample.outcomes)
+}
+\arguments{
+  \item{refset.calls}{is the data.frame returned by the
+  \link{testUnknowns} function. It contains column with
+  sampleIDs, z-scores and calls for T21, T18, T13 and the
+  fetal sex}
+
+  \item{sample.outcomes}{data.frame with column names: Dx,
+  Gender, SampleID}
+}
+\description{
+This function takes in the summed counts, the baseline and
+an outcomes table and calculates the overall performance on
+the dataset
+}
+\seealso{
+\code{\link{testUnknowns}}
+}
+
