@@ -56,12 +56,7 @@ testUnknowns <- function( ref.data.set, unknowns.counts.file,
   binned.counts <- data.frame(binned.counts) 
   sampleIDs <- binned.counts[,1] 
   binned.counts <- binned.counts[,-c(1)] 
-  binned.counts <- sapply(binned.counts, as.numeric) 
  
-  #sampleIDs<-data.frame(binned.counts[,ind,with=FALSE])
-  #sampleIDs <- sampleIDs[,1] 
-  #binned.counts <- binned.counts[,!ind, with=FALSE]
-
   n.all.samples <- nrow(binned.counts)
   n.bins <- ncol(binned.counts)
   binned.counts <- as.matrix(binned.counts) 
@@ -188,6 +183,7 @@ plotTestSample <- function(rapidr.test, input.sampleID, ordering = "normal") {
   if (ordering == "normal") {
     chrom.order <- c(1:22) 
   } else if(ordering == "gc") {
+    # Hard coded the chromosome order by increasing GC content 
     chrom.order <- c(4,13,5,6,3,18,8,2,7,12,21,14,9,11,10,1,15,20,16,17,22,19)
   }
   pos.order <- c() 

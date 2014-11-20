@@ -1,0 +1,13 @@
+CHANGES IN VERSION 0.1.1 
+-------------------------
+
+CHANGES 
+   * Added the option to change the number of principal components to discard 
+   * Added option to exclude samples that has low correlation to other samples in the dataset when building a reference set 
+   * Modified the package such that it now depends on GenomicRanges 1.18.1. Specifically, the function summarizeOverlaps() has been moved from GenomicRanges to the GenomicAlignments package and the package dependencies have been modified correspondingly 
+
+BUG FIXES 
+   * Fixed the parameter k in the makeBinnedCountsFile() function so it works properly 
+   * Removed the line sapply(binned.counts, as.numeric). It is not necessary and makes the data loading very slow 
+   * Added error message for when there are less than 2 samples of females or males 
+   * Fixed the issue for when there are no discard samples 

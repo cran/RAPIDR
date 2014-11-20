@@ -58,6 +58,7 @@ ref.set <- createReferenceSetFromCounts(counts.fname,
                              outcomes,
    	                         gcCorrect = FALSE,
    	                         PCA = FALSE,
+                                 filterBin = FALSE, 
    	                         gcContentFile = gcContent.fname) 
 
 

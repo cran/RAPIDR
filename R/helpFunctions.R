@@ -75,7 +75,7 @@ find.chrY.excl.bins <- function (cleaned.good.ratios, bin.names, cleaned.sampleI
   female.cts.mean[not.chrY.pos] <- 0 
   mean.cts.asc <- order(-female.cts.mean)
   per_cleaned <- sum(female.cts.mean[mean.cts.asc[1:25]])*100/sum(female.cts.mean[mean.cts.asc])
-  message("Excluding 25 bins,  ", per_cleaned, " % of counts mapped to chrY in females." )
+  message("... excluding 25 bins,  ", round(per_cleaned, digits=1), " % of counts mapped to chrY in females." )
   return(mean.cts.asc[1:25])
 }
 
@@ -124,7 +124,7 @@ find.excl.bins <- function (cleaned.good.ratios, bin.names, cleaned.sampleIDs.wi
 #' This function loads a bed file 
 #' 
 #' @param bedfile name of the bed file 
-#' @import IRanges GenomicRanges
+#' @import GenomicRanges
 #' 
 ReadBed <- function ( bedfile ) {
   data <- read.table(bedfile, header=FALSE) 
@@ -132,116 +132,6 @@ ReadBed <- function ( bedfile ) {
   bed <- with(data, GRanges(chr, IRanges(start, end))) 
   return(bed)
 }
-
-#' @title BinBam.gcCorrect 
-#' 
-#' @description
-#' Given a list of bam files, this function writes the output 
-#' to a text file after binning and doing gc Correction 
-#' NOTE: Not for production use 
-#' 
-#' @param bam.file name of bamfile 
-#' @param index index of bam file 
-#' @param gcContent name of the gccontent data 
-#' @import IRanges GenomicRanges 
-#' @importFrom Rsamtools scanBam BamFileList ScanBamParam 
-#' 
-BinBam.gcCorrect <- function(bam.file, index = bam.file, gcContent = NULL ) { 
-  library(BSgenome.Hsapiens.UCSC.hg19) 
-  hg19 <- BSgenome.Hsapiens.UCSC.hg19 
-  bf   <- BamFileList(bam.file, index = index)
-
-  message("loading bam file") 
-  param <- ScanBamParam(what = c("rname", "pos") ) 
-  bam  <- scanBam(bf[[1]], param = param) 
-  chrnames <- seqnames(hg19)[1:22]
-
-  ref.gc.all.bins <- rep(0,201) 
-  names(ref.gc.all.bins) <- seq(0,200,1) 
-  gc.all.bins <- ref.gc.all.bins 
-
-  gc.by.chr <- list() 
-  for (c in chrnames) { 
-     #message("loading gccontent") 
-     #gcContentFilename <- paste(gcContentFile, c, ".Rdata", sep = "") 
-     #load(gcContentFilename) 
-     thisgcContent <- gcContent[[c]] 
-     #ref.gc.by.bin <- table(thisgcContent[,1]) 
-     pos <- bam[[1]]$pos[which(bam[[1]]$rname == c)] 
-     gc.by.chr[[c]] <- thisgcContent[pos] 
-     gc.sample <- table(as.factor(gc.by.chr[[c]]))  
-   
-     num.sim <- length(pos)  
-
-     # Random pick 1e6 bins and build a table of gc content 
-     gc.by.chr.sample <- sample(thisgcContent[,1], num.sim, replace = TRUE) 
-     ref.gc <- table(gc.by.chr.sample) 
-
-     for (i in seq(1,201)) { 
-        gc.all.bins[i] <- gc.all.bins[i] + gc.sample[as.character(i)] 
-        ref.gc.all.bins[i] <- ref.gc.all.bins[i] + ref.gc[as.character(i)] 
-     }      
-  }   
-
-  gc.percent <- gc.all.bins/ref.gc.all.bins
-  gc.weights <- 1.0/gc.percent
-
-  gc.weights[!is.finite(gc.weights)] <- 1.0 
- 
-  corr.counts <- c()  
-  chr.name.list <- c() 
-
-  j <- 1 
-  chrnames <- seqnames(hg19)[1:24]
-
-  # hack to make it work for chrX and chrY for the moment
-  # Refactor later! 
-  thisgcContent <- gcContent[["chrX"]] 
-  pos <- bam[[1]]$pos[which(bam[[1]]$rname == "chrX")] 
-  gc.by.chr[["chrX"]] <- thisgcContent[pos] 
-  thisgcContent <- gcContent[["chrY"]] 
-  pos <- bam[[1]]$pos[which(bam[[1]]$rname == "chrY")] 
-  gc.by.chr[["chrY"]] <- thisgcContent[pos] 
-
-
-  for (c in chrnames) {
-     chr.len <- seqlengths(hg19)[j]
-     message("chr lens: ", chr.len) 
-     j <- j+1 
-     gc.by.chr[[c]][which(gc.by.chr[[c]] == 0)] <- 1 
-     gc.weighted.counts <- gc.weights[gc.by.chr[[c]]]  
-     #gc.weighted.counts <- rep(1, length(pos)) 
-     pos <- bam[[1]]$pos[which(bam[[1]]$rname == c)] 
-     n.bins <- floor(chr.len/20000) + 1
-     bins.edges <- findInterval(pos, seq(1,chr.len,20000))   
-     gc.df <- data.frame(gc.counts = gc.weighted.counts, bins = bins.edges) 
-     sum.bin.counts <- aggregate(. ~ bins, gc.df , sum) 
-
-     # aggregate loses the bins without any reads mapped, add it back in 
-     missing.bins <- which(!1:n.bins %in% sum.bin.counts$bins) 
-     missing.df <- data.frame(bins= missing.bins, gc.counts = rep(0, length(missing.bins)))  
-     sum.bin.counts <- rbind(sum.bin.counts, missing.df)  
-     sum.bin.counts <- sum.bin.counts[with(sum.bin.counts, order(bins)), ]
-     message("sd is: ", sd(sum.bin.counts$gc.counts)) 
-     corr.counts <- c(corr.counts, sum.bin.counts[,"gc.counts"]) 
-     chr.name.list <- c(chr.name.list, rep(c, length(sum.bin.counts[,"gc.counts"])))
-     #message("corr counts: ", length(corr.counts), " chrname: ", length(chr.name.list))
-     #pdf("tmp.pdf") 
-     #plot(sum.bin.counts$bins, sum.bin.counts$gc.counts) 
-     #dev.off() 
-     #print(sum.bin.counts) 
-  } 
-  
-  countData <- data.frame(counts = corr.counts, mask.counts = corr.counts,
-                             chrname = chr.name.list ) 
-  #pdf("gccontent.pdf") 
-  #plot(as.numeric(names(gc.percent)), gc.percent, ylim = c(0,2), xlim = c(40,150) ) 
-  #dev.off() 
-  
-  return(countData)  
-
-}  
-                             
 
 #' @title BinBam
 #' 
@@ -253,7 +143,7 @@ BinBam.gcCorrect <- function(bam.file, index = bam.file, gcContent = NULL ) {
 #' @param index index of bam file 
 #' @param mask  mask file in the bed format 
 #' @param k bin size in kilobases 
-#' @import IRanges GenomicRanges 
+#' @import GenomicRanges Rsamtools GenomicAlignments
 #' 
 BinBam <- function(bam.file, index = bam.file, mask = NULL, k = 20000) {  
 
@@ -290,8 +180,7 @@ BinListOfBam <- function (bam.file.list, mask = NULL, index = bam.file.list, k =
 
   for (each.bam in bam.file.list) { 
      ptm <- proc.time()
-     countData <- BinBam(each.bam, mask = mask) 
-     #countData <- BinBam.gcCorrect(each.bam, gcContent= "for_testing/gcContent/gcContentPerPosition") 
+     countData <- BinBam(each.bam, mask = mask, k = k) 
      gc() 
      if (is.null(all.binnedCounts)) { 
        all.binnedCounts <- data.frame(t(countData$counts))

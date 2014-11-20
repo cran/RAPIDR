@@ -12,10 +12,13 @@
 #' @param method either "zscore", "NCV" or "MAD", default is zscore         
 #' @param gcCorrect whether to do gc correction or not (True = do the correction)
 #' @param PCA whether to do PCA correction or not (True = do the correction)
+#' @param numPC number of principal components to discard (default = 10)  
 #' @param masked.counts.file file name of the masked counts file 
 #' @param gcContentFile file name of a Rdata object with the gcContent data 
 #' @param filterBin whether to filter bins based on unusually high counts and high
 #'        variance, default is to filter 
+#' @param removeOutlierSamples whether to remove samples which has a low correlation value 
+#'        to the rest of the reference set, default is FALSE 
 #' @param cleaned.binned.counts.fname file name to write to for the corrected binned
 #'        counts, default is not to write to file 
 #'
@@ -27,10 +30,14 @@ createReferenceSetFromCounts <- function( binned.counts.file, outcomes,
                                           combined.counts.fname = NULL, 
                                         method = "zscore", gcCorrect = FALSE, 
                                           gcContentFile = NULL, filterBin = TRUE,
-                                          PCA = FALSE, masked.counts.file = NULL,
+                                          removeOutlierSamples = FALSE, 
+                                          PCA = FALSE, numPC = 10, 
+                                          masked.counts.file = NULL,
                                           cleaned.binned.counts.fname = NULL) {
 
 
+    ptm <- proc.time() 
+    #print(ptm) 
     message("Loading binned counts file")
     masked.binned.counts <- NULL 
 
@@ -52,19 +59,15 @@ createReferenceSetFromCounts <- function( binned.counts.file, outcomes,
     bin.names <- names(binned.counts)
     bin.names <- bin.names[2:length(bin.names)] 
 
+    #message("making data.frame") 
     binned.counts <- as.data.frame(binned.counts) 
     sampleIDs <- binned.counts[,1] 
     binned.counts <- binned.counts[,-c(1)]  
-    binned.counts <- sapply(binned.counts, as.numeric) 
-    #sampleIDs<-data.frame(binned.counts[,ind,with=FALSE])
-    #sampleIDs <- sampleIDs[,1] 
-    #binned.counts <- binned.counts[,!ind, with=FALSE]
 
     if (!is.null(masked.counts.file)) {
       masked.binned.counts <- fread(masked.counts.file, sep=',', colClasses=list(character=1))
       masked.binned.counts <- data.frame(masked.binned.counts) 
       masked.binned.counts <- masked.binned.counts[,-c(1)] 
-      #masked.binned.counts <- masked.binned.counts[,!ind, with=FALSE]
     }
    
     n.all.samples <- nrow(binned.counts)
@@ -75,6 +78,9 @@ createReferenceSetFromCounts <- function( binned.counts.file, outcomes,
        masked.binned.counts <- as.matrix(masked.binned.counts)  
     }
     
+    #message("Memory used: ") 
+    #print(sort(sapply(ls(),function(x){object.size(get(x))}) ))  
+
     if ( gcCorrect & !is.null(masked.counts.file)) {
       message("Doing gc correction")
       binned.counts <- gcCorrectCounts(binned.counts, bin.names, masked.binned.counts, gcContentFile)
@@ -87,12 +93,14 @@ createReferenceSetFromCounts <- function( binned.counts.file, outcomes,
     
     discard.pos <- c()
     n.discard <- 0  
+    
+    #message("Memory used: ") 
+    #print(sort(sapply(ls(),function(x){object.size(get(x))}) ))  
 
     # Checking every sampleID has an outcome 
     message("Checking every sampleID has an outcome")
     for (i in 1:n.all.samples) { 
       eachSample <- sampleIDs[i]
-      #print(eachSample)
       pos <- which(outcomes$SampleID == as.character(eachSample))
       if (length(pos) == 0) { 
         message("No outcomes for Sample ", eachSample)    
@@ -111,7 +119,15 @@ createReferenceSetFromCounts <- function( binned.counts.file, outcomes,
       sampleIDs.with.outcomes[i,"Dx"] <- outcomes[pos, "Dx"]
       sampleIDs.with.outcomes[i,"Gender"] <- outcomes[pos, "Gender"]
     }
+   
+    # Check we have at least two female and two male samples 
+    n.females <- length(which(sampleIDs.with.outcomes[,"Gender"] == "Female") ) 
+    n.males <- length(which(sampleIDs.with.outcomes[,"Gender"] == "Male") ) 
     
+    if (n.females < 3 | n.males < 3) { 
+      stop("Requires at least 2 samples of females and 2 samples of males.")        
+    }  
+
     # Find bins to exclude in chromosome Y 
     message("Finding bins to exclude in Chr Y ")
     if(length(discard.pos) > 0) {
@@ -119,7 +135,6 @@ createReferenceSetFromCounts <- function( binned.counts.file, outcomes,
     } else {
       excl.bins <- find.chrY.excl.bins(binned.counts, bin.names, sampleIDs.with.outcomes) 
     }
-    
 
     total.counts <-rowSums(binned.counts) 
     binned.ratios <- binned.counts 
@@ -166,7 +181,6 @@ createReferenceSetFromCounts <- function( binned.counts.file, outcomes,
       binned.ratios[i,] <- binned.ratios[i,]/this.total * 1e6     
     }
 
-    message("Number of discards:", length(discard.pos))  
     rm(binned.counts)
     rm(masked.binned.counts)
 
@@ -181,8 +195,15 @@ createReferenceSetFromCounts <- function( binned.counts.file, outcomes,
     if ( PCA ) {
       #data.mat.clean.for.PCA <- binned.ratios[ normals.pos, ]
       #PCA_output <- doPCA(binned.ratios[normals.pos, ]) 
+      if (numPC < 1) { 
+         stop("Number of PC to remove must be at least 1 up to the number of female samples") 
+      } 
+      if (length(females.pos) < numPC ) { 
+         stop("There are less female samples than the number of principal components. PCA error correction will not work properly. Try reducing the numPC or increase the number of samples") 
+      } 
+
       data.mat.clean.for.PCA <- binned.ratios[ females.pos, ]
-      PCA_output <- doPCA(binned.ratios[females.pos, ]) 
+      PCA_output <- doPCA(binned.ratios[females.pos, ], numPC = numPC) 
       #save(PCA_output, file = "~/UCL/PhaseI_all/PCA_output.Rdata")
       #load("~/UCL/PhaseI_all/PCA_output.Rdata")
       # Use the PCA results to correct the counts 
@@ -191,7 +212,6 @@ createReferenceSetFromCounts <- function( binned.counts.file, outcomes,
       } else {
         cleaned.good.ratios <- correct.counts.with.PCA(PCA_output, binned.ratios)
       }
-         gc()
     } else {
       # Don't do any corrections 
       message("Not doing PCA")
@@ -204,13 +224,45 @@ createReferenceSetFromCounts <- function( binned.counts.file, outcomes,
       
     # Find the mean of each bin from the normals 
     if (length(discard.pos) > 0) {
-    cleaned.normals.pos <- which(sampleIDs[-discard.pos] %in% normals.ids)
+      cleaned.normals.pos <- which(sampleIDs[-discard.pos] %in% normals.ids)
     } else {
       cleaned.normals.pos <- normals.pos 
     }
     bin.means <- colMeans(cleaned.good.ratios[cleaned.normals.pos,])
     bin.sd    <- apply(cleaned.good.ratios[cleaned.normals.pos,], 2, sd)
+
+    # Checking for samples which are outliers 
+    message("Checking for outlier samples...") 
+    ratios.cor <- cor(bin.means, t(cleaned.good.ratios)) 
+    if (length(discard.pos) > 0) { 
+       ratios.df <- data.frame(corr = ratios.cor[1,], sampleID = sampleIDs[-discard.pos]) 
+    } else { 
+       ratios.df <- data.frame(corr = ratios.cor[1,], sampleID = sampleIDs) 
+    } 
+    ratios.order <- order(ratios.df[,1]) 
+    low.corr.samples <- ratios.df[which(ratios.df$corr < 0.8), 2] 
     
+    if (removeOutlierSamples == FALSE) { 
+       message("Samples with correlation to the mean bin counts of < 0.8. You may want to remove these from the reference set.") 
+       print(low.corr.samples) 
+    } else {
+       if(length(discard.pos) >0) {
+          cleaned.good.ratios <- cleaned.good.ratios[-which(sampleIDs[-discard.pos] %in% low.corr.samples),]
+       } else { 
+          cleaned.good.ratios <- cleaned.good.ratios[-which(sampleIDs %in% low.corr.samples),]
+       } 
+       new.discards <- which(sampleIDs %in% low.corr.samples) 
+       discard.pos <- c(discard.pos, new.discards) 
+       n.outliers <- length(new.discards) 
+       message("... removing ", n.outliers, " samples as outliers") 
+
+       # Re-calculate the bin.means and bin.sd after taking out the discards  
+       cleaned.normals.pos <- which(sampleIDs[-discard.pos] %in% normals.ids) 
+       bin.means <- colMeans(cleaned.good.ratios[cleaned.normals.pos,])
+       bin.sd    <- apply(cleaned.good.ratios[cleaned.normals.pos,], 2, sd)
+       
+    } 
+
     message("Summing counts per chromosome...")
     if (length(discard.pos) > 0) {
       cleaned.counts.per.chr <- sum.counts(cleaned.good.ratios, bin.names, total.counts[-discard.pos], 
@@ -245,7 +297,7 @@ createReferenceSetFromCounts <- function( binned.counts.file, outcomes,
     ref.data.set[["bin.sd"]] <- bin.sd
     
     class(ref.data.set) <- "rapidr.ref"
-    
+
     # Evaluate the reference set 
     refset.calls <- callUnknowns(cleaned.counts.per.chr, cleaned.counts.per.chr$SampleID, baselines)
     refset.results <- evalPerformance(refset.calls, outcomes)
@@ -256,7 +308,11 @@ createReferenceSetFromCounts <- function( binned.counts.file, outcomes,
     if ( ! is.null(cleaned.binned.counts.fname) ) {
       message("Writing the cleaned binned counts to the file provided.")
       # Convert ratios back to counts 
-      cleaned.total <- total.counts[-discard.pos]
+      if (length(discard.pos) > 0) { 
+         cleaned.total <- total.counts[-discard.pos]
+      } else { 
+         cleaned.total <- total.counts
+      } 
       binned.counts <- cleaned.good.ratios
       for (i in 1:nrow(cleaned.good.ratios)) { 
         this.total<-cleaned.total[i]
@@ -265,10 +321,16 @@ createReferenceSetFromCounts <- function( binned.counts.file, outcomes,
       }
       rm(cleaned.good.ratios) 
       sampleIDs <- as.character(sampleIDs)
-      binned.counts <- cbind(sampleIDs[-discard.pos], binned.counts)
+      if (length(discard.pos) > 0 ) {  
+         binned.counts <- cbind(sampleIDs[-discard.pos], binned.counts)
+      } else { 
+         binned.counts <- cbind(sampleIDs, binned.counts)
+      } 
       write.table(binned.counts, file = cleaned.binned.counts.fname, sep = ",", quote = FALSE, row.names = FALSE, col.names = FALSE)     
     }    
-    
+   
+    #message("Time used:")  
+    #print(proc.time() - ptm) 
     return(ref.data.set)
     
 }
@@ -436,7 +498,7 @@ writeCleanedCountsFile <- function( binned.counts.file, cleaned.binned.counts.fn
 
 makeBinnedCountsFile <- function (bam.file.list, sampleIDs, binned.counts.fname, mask = NULL, k = 20000) {
   message("Binning counts in bam files")
-  res <- BinListOfBam(bam.file.list, mask = mask)
+  res <- BinListOfBam(bam.file.list, mask = mask, k = k)
   all.binnedCounts <- res[[1]]
   masked.binnedCounts <- res[[2]]
   #write.table(colnames(all.binnedCounts), file = bin.names.fname, quote = FALSE, row.names = FALSE, col.names = FALSE)

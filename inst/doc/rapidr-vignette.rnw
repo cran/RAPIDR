@@ -19,7 +19,7 @@ RAPIDR was written as part of the RAPID project in the UK for the evaluation of 
 
 \section{Create binned counts file from BAMs} 
 
-RAPIDR fits into the NIPD workflow after the sequencing and alignment of reads, as illustrated in Figure \ref{fig:workflow}. To create BAM files from fastq files outputted from the sequencer, a short-read aligner such as Bowtie or BWA can be used.  It is important to only keep alignments with unique mappings. Once you have the BAM files, the first step is to create a binned counts file. This is done using the function \texttt{makeBinnedCountsFile} in RAPIDR, which in turn calls functions in the \texttt{GenomicRanges} R-package. 
+RAPIDR fits into the NIPD workflow after the sequencing and alignment of reads, as illustrated in Figure \ref{fig:workflow}. To create BAM files from fastq files outputted from the sequencer, a short-read aligner such as Bowtie or BWA can be used.  It is important to only keep alignments with unique mappings. Once you have the BAM files, the first step is to create a binned counts file. This is done using the function \texttt{makeBinnedCountsFile} in RAPIDR, which in turn calls functions in the \texttt{GenomicRanges} R-package. RAPIDR requires \texttt{GenomicRanges} version 1.14.4, and will not work with the newest version as the function \texttt{summarizeOverlaps} has moved to another package. 
  
 \begin{figure}
 \begin{center}
@@ -66,14 +66,13 @@ When a mask file is supplied, two output binned counts files are created.
 \section{Build the reference} 
 
 Before samples with unknown outcomes can be analysed, we need to build a reference using a set of samples with no known aneuploidy. It is very important that the laboratory preparation method used for this reference set is exactly the same as the method that will be used for the later test samples. Whilst it is not essential for the reference set to contain aneuploidy samples, if aneuploidy samples are provided, RAPIDR will provide estimates of sensitivity and specificity (along with the respective confidence intervals). 
-
-The basic principle for calling aneuploidy simply involves calculating a z-score. The 
+ 
 
 \subsection{GC correction} 
 
 It is well known that raw read counts do not follow ideal counting statistics due to GC bias introduced by the PCR process. Various methods have been proposed to normalise the counts. RAPIDR implements two methods from the literature: the Normalised Chromosome Value (NCV) method and weighting of counts by GC content bins. NCV is the simpler of the two methods and entails taking the ratio between the counts mapped to the chromosome of interest and some other chromosome. The chromosome used in the denominator is chosen such that the variance of the NCV ratios is minimised. In the GC bin weighting method, we first determine the read count for bins of some size (the default in RAPIDR is 20kb), and then average the counts in each 0.5\% of GC content bin. Counts in each GC content bin is weighted by $W_i = \bar{M} / {M_i}$, where $\bar{M}$ is the average counts across all GC content bins, and $M_i$ is the average count in bin $i$. 
 
-We also implemented a third method for GC correction based on principal component analysis (PCA), which as far we know, has not been used in the context of NIPD. In the PCA method, we first use the normals in the reference set to find the principal components by treating the counts ratios in each bin as a variable. Then we regress the count ratios in each bin with the first 10 principal components, assuming that they represent systematic noise. 
+We also implemented a third method for GC correction based on principal component analysis (PCA), which as far we know, has not been used in the context of NIPD. In the PCA method, we first use the normals in the reference set to find the principal components by treating the counts ratios in each bin as a variable. Then we regress the count ratios in each bin with the first 10 principal components, assuming that they represent systematic noise. There is also the option to set the number of principal components to exclude by setting the parameter \texttt{numPC}. 
 
 Here is an example of how to create a reference set: 
 
@@ -114,6 +113,7 @@ ref.set <- createReferenceSetFromCounts(counts.fname,
                              outcomes,
    	                         gcCorrect = FALSE,
    	                         PCA = FALSE,
+                                 filterBin = FALSE, 
    	                         gcContentFile = gcContent.fname) 
 @
  

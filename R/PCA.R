@@ -8,7 +8,8 @@ correct.counts.with.PCA<- function ( PCA_output, ratios.mat ) {
   PCA.rotations  <- PCA_output[["PCA.rotations"]]
   PCA.centers    <- PCA_output[["PCA.centers"]] 
   coeff.mat      <- PCA_output[["coeff.mat"]] 
-  
+  numPC          <- PCA_output[["numPC"]] 
+ 
   n.bins <- ncol(ratios.mat)
   #ratios.mat<-matrix(data=NA,nrow=nrow(binned.counts),ncol=ncol(binned.counts))
   
@@ -19,11 +20,18 @@ correct.counts.with.PCA<- function ( PCA_output, ratios.mat ) {
   message("Making PCA.scores")
   PCA.scores <- t(t(PCA.rotations) %*% t(ratios.mat))
   
-  PCA.var<-data.frame(intercept=rep(1), PCA1=c(PCA.scores[,1]), PCA2=c(PCA.scores[,2]), 
-                      PCA3=c(PCA.scores[,3]), PCA4=c(PCA.scores[,4]),
-                      PCA5 = c(PCA.scores[,5]), PCA6 = c(PCA.scores[,6]), 
-                      PCA7 = c(PCA.scores[,7]), PCA8 = c(PCA.scores[,8]), 
-                      PCA9 = c(PCA.scores[,9]), PCA10 = c(PCA.scores[,10]))
+  PCA.var<-data.frame(intercept=rep(1)) 
+  for(i in 1:numPC) { 
+      pcname = paste("PCA", i, sep = "") 
+      PCA.var <- cbind(PCA.var, PCA.scores[,i]) 
+      names(PCA.var)[1+i] <- pcname 
+  }
+ 
+  #PCA.var<-data.frame(intercept=rep(1), PCA1=c(PCA.scores[,1]), PCA2=c(PCA.scores[,2]), 
+  #                    PCA3=c(PCA.scores[,3]), PCA4=c(PCA.scores[,4]),
+  #                    PCA5 = c(PCA.scores[,5]), PCA6 = c(PCA.scores[,6]), 
+  #                    PCA7 = c(PCA.scores[,7]), PCA8 = c(PCA.scores[,8]), 
+  #                    PCA9 = c(PCA.scores[,9]), PCA10 = c(PCA.scores[,10]))
   
   rm(PCA.scores)
   rm(PCA.rotations)
@@ -47,7 +55,7 @@ correct.counts.with.PCA<- function ( PCA_output, ratios.mat ) {
   return(ratios.mat)
 }
 
-doPCA <- function (data.mat.clean.for.PCA) {
+doPCA <- function (data.mat.clean.for.PCA, numPC = 10 ) {
   
   message("doing PCA...")
   my.pca        <- prcomp(data.mat.clean.for.PCA)  
@@ -57,11 +65,19 @@ doPCA <- function (data.mat.clean.for.PCA) {
   #load("~/UCL/PhaseI_all/P1_733_gccounts.Rdata")
   
   message("doing the linear regression modelling...")
-  PCA.var<-data.frame(intercept=rep(1), PCA1=c(PCA.scores[,1]), PCA2=c(PCA.scores[,2]), 
-                      PCA3=c(PCA.scores[,3]), PCA4=c(PCA.scores[,4]),
-                      PCA5 = c(PCA.scores[,5]), PCA6 = c(PCA.scores[,6]), 
-                      PCA7 = c(PCA.scores[,7]), PCA8 = c(PCA.scores[,8]), 
-                      PCA9 = c(PCA.scores[,9]), PCA10 = c(PCA.scores[,10]))
+
+  PCA.var<-data.frame(intercept=rep(1)) 
+  for(i in 1:numPC) { 
+      pcname = paste("PCA", i, sep = "") 
+      PCA.var <- cbind(PCA.var, PCA.scores[,i]) 
+      names(PCA.var)[1+i] <- pcname 
+  } 
+  
+  #PCA.var<-data.frame(intercept=rep(1), PCA1=c(PCA.scores[,1]), PCA2=c(PCA.scores[,2]), 
+  #                    PCA3=c(PCA.scores[,3]), PCA4=c(PCA.scores[,4]),
+  #                    PCA5 = c(PCA.scores[,5]), PCA6 = c(PCA.scores[,6]), 
+  #                    PCA7 = c(PCA.scores[,7]), PCA8 = c(PCA.scores[,8]), 
+  #                    PCA9 = c(PCA.scores[,9]), PCA10 = c(PCA.scores[,10]))
   
   PCA.mat <- data.matrix(PCA.var)
   reg.mat<-solve(t(PCA.mat) %*% PCA.mat)%*%t(PCA.mat)
@@ -74,7 +90,8 @@ doPCA <- function (data.mat.clean.for.PCA) {
   PCA_output[["PCA.centers"]] <- my.pca$center
   PCA_output[["PCA.rotations"]] <- my.pca$rotation
   PCA_output[["coeff.mat"]] <- coeff.mat 
-  
+  PCA_output[["numPC"]]     <- numPC 
+ 
   return(PCA_output)
   
 }
